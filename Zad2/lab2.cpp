@@ -4,99 +4,246 @@
 #include <mutex>
 #include <condition_variable>
 #include <chrono>
-#include <ctime>
 #include <cstdlib>
 #include <vector>
 
 using namespace std;
 
 enum State {
-    Reading,
-    Thinking,
-    Writing,
-    StuckInAnExistentialDread,
+    Waiting =0,
+    Reading =1,
+    Thinking=2,
+    Writing=3,
+    StuckInAnExistentialDread=4,
 };
 
 struct Book {
-    mutex *number;
+    Book()
+    {
+        pageCount = 0;
+        readCount = 0;
+        canBePickedUp = true;
+    }
     int pageCount;
+    atomic <bool> canBePickedUp;
+   atomic <int> readCount;
+   mutex isWritten;
+   condition_variable canBeWritten;
+   condition_variable canBeRead;
 };
 
 class Writer {
 public:
-    Writer() : state(StuckInAnExistentialDread), timeInState(-1), number(-777) {
+    Writer() : state(StuckInAnExistentialDread), timeInState(-1), number(-777), lock(mutex) {
     }
 
-    Writer(std::thread &thread, int number) : state(StuckInAnExistentialDread), number(number), timeInState(-1) {
-        this->thread = std::move(thread);
+    Writer(int number) : state(StuckInAnExistentialDread), number(number), timeInState(-1), lock(mutex) {
     }
 
-    void doAction(Book *mutex) {
-        switch (state) {
-            case Reading:
-                break;
-            case Thinking:
-                break;
-            case Writing:
-                int randomNumber
-                write(book[randomNumber]);
-                break;
-            case StuckInAnExistentialDread:
-                break;
+    void setThread(Book& book) {
+        thread = std::make_unique<std::thread>(&Writer::doAction, this, std::ref(book));
+    }
+
+    void joinThread()
+    {
+        thread->join();
+    }
+
+    void doAction(Book& book) {
+        while(true)
+        {
+            int action = rand() % 2 + 2;
+            int duration;
+            int pageToWrite;
+            switch (action) {
+                case Thinking:
+                    state = Thinking;
+                    duration = rand() % 5000 + 1000;
+                    this_thread::sleep_for(chrono::milliseconds(duration));
+                    break;
+                case Writing:
+                    if(book.pageCount == 0 && book.canBePickedUp)
+                    {
+                        book.canBePickedUp = false;
+                        state = Writing;
+                        duration = rand()% 2000 + 500;
+                        book.isWritten.lock();
+                        pageToWrite = rand()% 250 + 50;
+                        this_thread::sleep_for(chrono::milliseconds(duration));
+                        book.pageCount += pageToWrite;
+                        book.isWritten.unlock();
+                        book.canBeRead.notify_all();
+                        break;
+                    }
+                    if(book.readCount < 3)
+                    {
+                        state = Waiting;
+                        book.canBeWritten.wait(lock,[&](){return book.readCount == 3;});
+                    }
+                    state = Writing;
+                    duration = rand()% 2000 + 500;
+                    book.isWritten.lock();
+                    this_thread::sleep_for(chrono::milliseconds(duration));
+                    book.canBeRead.notify_all();
+                    break;
+                default:
+                    state = StuckInAnExistentialDread;
+                    break;
+            }
         }
     }
 
+    string getStringState(){
+        switch (state) {
+            case Waiting:
+                return "Waiting";
+            case Reading:
+                return "Reading";
+            case Writing:
+                return "Writing";
+            case Thinking:
+                return "Thinking";
+            case StuckInAnExistentialDread:
+                return "StuckInAnExistentialDread";
+            default:
+                return "Unknown";
+        }
+
+    }
+
 private:
-    thread thread;
+    std::unique_ptr<std::thread> thread;
     State state;
     int number;
     int timeInState;
-
-    void write() {
-
-    }
+    mutex mutex;
+    unique_lock<std::mutex> lock{mutex, std::defer_lock};
 };
 
 class Reader {
 public:
-    Reader() : state(StuckInAnExistentialDread), timeInState(-1), number(-777) {
+    Reader() : state(StuckInAnExistentialDread), timeInState(-1), lock(mutex) {
     }
 
-    Reader(std::thread &thread, int number) : state(StuckInAnExistentialDread), timeInState(-1) {
-        this->thread = std::move(thread);
+    Reader(int number) : state(StuckInAnExistentialDread), timeInState(-1), lock(mutex) {
+    }
+
+    void setThread(Book& book) {
+        thread = std::make_unique<std::thread>(&Reader::doAction, this, std::ref(book));
+    }
+
+    void joinThread()
+    {
+        thread->join();
+    }
+
+    void doAction(Book &book) {
+        while(true)
+        {
+            int action = rand() % 2 + 1;
+            int duration;
+            switch (action) {
+                case Thinking:
+                    state = Thinking;
+                    duration = rand() % 500 + 100;
+                    this_thread::sleep_for(chrono::milliseconds(duration));
+                    break;
+                case Reading:
+                    if(!book.canBePickedUp || book.pageCount == 0)
+                    {
+                        state = Waiting;
+                        book.canBeRead.wait(lock);
+                    }
+                    state = Reading;
+                    duration = rand()% 2000 + 500;
+                    this_thread::sleep_for(chrono::milliseconds(duration));
+                    book.readCount++;
+                    if(book.readCount == 3)
+                    {
+                        book.canBeWritten.notify_all();
+                    }
+                    break;
+                default:
+                    state = StuckInAnExistentialDread;
+                    break;
+            }
+        }
+    }
+
+    string getStringState(){
+        switch (state) {
+            case Waiting:
+                return "Waiting";
+            case Reading:
+                return "Reading";
+            case Thinking:
+                return "Thinking";
+            case StuckInAnExistentialDread:
+                return "StuckInAnExistentialDread";
+            default:
+                return "Unknown";
+        }
     }
 
 private:
-    thread thread;
+    mutex mutex;
+    unique_lock<std::mutex> lock{mutex, std::defer_lock};
+    std::unique_ptr<std::thread> thread;
     State state;
     int timeInState;
-    int number;
 };
 
-void bookCub() {
-
+void bookClubSimulator(vector<Reader>& readers, vector <Writer>& writers, Book& book){
+    while(true)
+    {
+        for(auto &reader : readers)
+        {
+            cout << "Reader is " << reader.getStringState() << "\n";
+        }
+        for(auto &writer : writers)
+        {
+            cout << "Writer is " << writer.getStringState() << "\n";
+        }
+        this_thread::sleep_for(chrono::milliseconds(100));
+        cout <<"\n";
+        system("cls");
+    }
 }
 
 int main() {
-    cout << "Enter: number of books / number of readers / numbers of writers\n";
-    int numWriters, numBooks, numReaders;
-    cin >> numBooks >> numReaders >> numWriters;
+    int numReaders=5;
+    int numWriters=2;
 
-    vector<Book> books;
-    vector<Reader> readers;
-    vector<Writer> writers;
+    //cin >> numReaders >> numWriters;
 
-    for (int i = 0; i < numBooks; i++) {
-        Book tempBook(new mutex(), 1000);
-        books.push_back(tempBook);
+    vector<Reader> readers(numReaders);
+    vector<Writer> writers(numWriters);
+
+    Book book;
+
+    for(int i = 0;i<numReaders;i++)
+    {
+        //std::thread t(&Reader::doAction, &readers[i], std::ref(book));
+        readers[i].setThread(book);
     }
 
-    for (int i = 0; i < numReaders; i++) {
-        Reader tempReader(new thread(),i);
-        readers.push_back(tempReader);
+    for(int i = 0;i<numWriters;i++)
+    {
+        //std::thread t(&Writer::doAction, &writers.back(), std::ref(book));
+        writers[i].setThread(book);
     }
 
-    for (int i = 0; i < numWriters; i++) {
+    unique_ptr<thread> t = make_unique<thread>(bookClubSimulator,ref(readers),ref(writers),ref(book));
 
+    t->join();
+
+    for(int i = 0;i<numReaders;i++)
+    {
+        readers[i].joinThread();
+    }
+
+    for(int i = 0;i<numWriters;i++)
+    {
+        writers[i].joinThread();
     }
 }
