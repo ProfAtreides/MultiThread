@@ -9,3 +9,5 @@ add_executable(Zad1 Zad1/main.cpp)
 add_executable(Zad2 Zad2/lab2.cpp)
 
 add_executable(Zad3 Zad3/lab3.cpp)
+
+add_executable(Zad4 Zad4/lab4.cpp)
