@@ -18,13 +18,6 @@ mutex mtx;
 
 condition_variable cv_canBeWritten, cv_canBeRead;
 
-enum State {
-    Waiting = 0,
-    Reading = 1,
-    Writing = 2,
-    StuckInAnExistentialDread = 3,
-};
-
 void writer(int index) {
 
     random_device rd;
@@ -46,6 +39,7 @@ void writer(int index) {
 
         dataWritten += addPages;
         cout << "Writer " << index << " wrote: " << addPages << endl;
+        cout <<std::flush;
 
         readCount = 0;
         cv_canBeRead.notify_all();
@@ -62,6 +56,7 @@ void reader(int id) {
             readCount++;
 
             cout << "Reader " << id << " read: " << dataWritten << endl;
+            cout <<std::flush;
 
             if (readCount == 3) {
                 cv_canBeWritten.notify_one();

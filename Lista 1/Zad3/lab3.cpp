@@ -48,18 +48,15 @@ int main() {
     string name[] = {"Micheal", "Pam", "Dwight", "Jim", "Stanley", "Angela", "Kevin", "Oscar", "Creed"};
 
     thread *smokers = new thread[n];
+
     for (int i = 0; i < n; ++i) {
         smokers[i] = thread(smokerProcess, name[i]);
     }
 
-    // Oczekiwanie na zakończenie wątków
     for (int i = 0; i < n; ++i) {
         smokers[i].join();
     }
 
-    // Zniszczenie semaforów
     sem_destroy(&grinderSem);
     sem_destroy(&matchboxSem);
-
-    return 0;
 }
