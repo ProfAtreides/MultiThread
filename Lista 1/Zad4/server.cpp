@@ -1,10 +1,11 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <WS2tcpip.h> // Winsock library
+#include <WS2tcpip.h>
 #include <thread>
 #include <cmath>
-#pragma comment (lib, "ws2_32.lib") // Winsock library
+#include <mutex>
+#pragma comment (lib, "ws2_32.lib")
 
 using namespace std;
 
@@ -46,8 +47,6 @@ double calcGamma(int n, int p) {
 
 
 int main() {
-    // Initialize Winsock
-
     cout <<"Server started...\n";
 
     WSADATA wsData;
@@ -58,7 +57,6 @@ int main() {
         return 1;
     }
 
-    // Create socket
     SOCKET listening = socket(AF_INET, SOCK_STREAM, 0);
     if (listening == INVALID_SOCKET) {
         std::cerr << "Can't create socket! Quitting" << std::endl;
@@ -66,18 +64,15 @@ int main() {
         return 1;
     }
 
-    // Bind the socket to IP and port
     sockaddr_in hint;
     hint.sin_family = AF_INET;
     hint.sin_port = htons(54000);
-    hint.sin_addr.S_un.S_addr = INADDR_ANY; // Could also use inet_pton
+    hint.sin_addr.S_un.S_addr = INADDR_ANY;
 
     bind(listening, (sockaddr*)&hint, sizeof(hint));
 
-    // Tell Winsock the socket is for listening
     listen(listening, SOMAXCONN);
 
-    // Wait for a connection
     sockaddr_in client;
     int clientSize = sizeof(client);
 
@@ -89,24 +84,19 @@ int main() {
         return 1;
     }
 
-    // Receive data from client
     int n,p;
     recv(clientSocket, (char*)&n, sizeof(int), 0);
     recv(clientSocket, (char*)&p, sizeof(int), 0);
 
     cout << "Received data from client: n = " << n << ", p = " << p << "\n";
 
-    // Calculate partial sum
     double result = calcGamma(n, p);
 
-    // Send result to client
     send(clientSocket, (char*)&result, sizeof(double), 0);
 
-    // Close sockets
     closesocket(clientSocket);
     closesocket(listening);
 
-    // Cleanup Winsock
     WSACleanup();
 
     cout << "Closing server...\n";
