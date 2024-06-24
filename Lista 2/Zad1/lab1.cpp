@@ -5,6 +5,7 @@
 #include <climits>
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 
 // Struktura operacji
 struct Operation {
@@ -13,18 +14,30 @@ struct Operation {
     int processingTime;
 };
 
-// Przykładowe dane wejściowe (można zmodyfikować)
-std::vector<Operation> operations = {
-        {1, 1, 3},
-        {1, 2, 2},
-        {2, 1, 2},
-        {2, 2, 1},
-        {3, 1, 4},
-        {3, 2, 3}
-};
+std::vector<Operation> operations;
 
-int numTasks = 3;
-int numMachines = 2;
+int numMachines;
+int numTasks;
+
+void loadData(){
+    std::fstream file("../Zad1/data.txt", std::ios_base::in);
+
+    if (!file.is_open()) {
+        std::cout << "Error: file not found\n";
+        exit(1);
+    }
+
+    file >> numMachines >> numTasks;
+    for(int i = 0; i < numTasks; i++){
+        for(int j = 0; j < numMachines; j++){
+            Operation temp;
+            temp.taskId = i + 1;
+            file >> temp.machineId;
+            file >> temp.processingTime;
+            operations.push_back(temp);
+        }
+    }
+}
 
 // Generowanie losowych początkowych rozwiązań
 std::vector<std::vector<int>> generateInitialSolutions(int numSolutions, int numOperations) {
@@ -112,6 +125,8 @@ void scatterSearch(int rank, int size) {
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
+
+    loadData();
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
