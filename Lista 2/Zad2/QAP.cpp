@@ -8,15 +8,10 @@
 #include <ctime>
 #include <direct.h>
 
-// Dane wejściowe (przykład)
 int n;
-
 int bestSolution;
 
-// Koszty na jednostkę odległości pomiędzy urządzeniami
 int costMatrix[1024][1024];
-
-// Odległości pomiędzy lokalizacjami
 int distanceMatrix[1024][1024];
 
 void loadData() {
@@ -40,7 +35,6 @@ void loadData() {
     }
 }
 
-// Generowanie losowych początkowych rozwiązań
 std::vector<std::vector<int>> generateInitialSolutions(int numSolutions) {
     std::vector<std::vector<int>> solutions(numSolutions, std::vector<int>(n));
     for (auto &solution: solutions) {
@@ -52,7 +46,6 @@ std::vector<std::vector<int>> generateInitialSolutions(int numSolutions) {
     return solutions;
 }
 
-// Funkcja oceny rozwiązania (sumaryczny koszt)
 int evaluateSolution(const std::vector<int> &solution) {
     int totalCost = 0;
     for (int i = 0; i < n; ++i) {
@@ -63,7 +56,6 @@ int evaluateSolution(const std::vector<int> &solution) {
     return totalCost;
 }
 
-// Kombinacja dwóch rozwiązań
 std::vector<int> combineSolutions(const std::vector<int> &sol1, const std::vector<int> &sol2) {
     std::vector<int> combined(sol1.size());
     for (size_t i = 0; i < sol1.size(); ++i) {
@@ -72,10 +64,8 @@ std::vector<int> combineSolutions(const std::vector<int> &sol1, const std::vecto
     return combined;
 }
 
-// Poprawa rozwiązania (np. przez lokalne przeszukiwanie)
 std::vector<int> improveSolution(const std::vector<int> &solution) {
     std::vector<int> improvedSolution = solution;
-    // Prosta zamiana dwóch lokalizacji
     if (solution.size() > 1) {
         std::swap(improvedSolution[0], improvedSolution[1]);
     }
@@ -83,16 +73,12 @@ std::vector<int> improveSolution(const std::vector<int> &solution) {
     return improvedSolution;
 }
 
-// Główna funkcja harmonogramująca z użyciem Scatter Search
 void scatterSearch(int rank, int size) {
-    int numSolutions = 50;
+    int numSolutions = 100;
 
-    // Generowanie początkowej populacji
     std::vector<std::vector<int>> solutions = generateInitialSolutions(numSolutions);
 
-    // Główna pętla Scatter Search
     for (int iteration = 0; iteration < 100; ++iteration) {
-        // Kombinacja i poprawa rozwiązań
         std::vector<std::vector<int>> newSolutions;
         for (size_t i = 0; i < solutions.size(); ++i) {
             for (size_t j = i + 1; j < solutions.size(); ++j) {
@@ -102,22 +88,16 @@ void scatterSearch(int rank, int size) {
             }
         }
 
-        // Selekcja najlepszych rozwiązań
         solutions.insert(solutions.end(), newSolutions.begin(), newSolutions.end());
         std::sort(solutions.begin(), solutions.end(), [](const std::vector<int> &a, const std::vector<int> &b) {
             return evaluateSolution(a) < evaluateSolution(b);
         });
-        solutions.resize(numSolutions);  // Zachowaj tylko najlepsze rozwiązania
+        solutions.resize(numSolutions);
     }
 
-    // Proces 0: Zbiera wyniki i wyświetla harmonogram
     if (rank == 0) {
-        std::cout << "Best solution:\n";
-        for (int loc: solutions[0]) {
-            std::cout << loc << " ";
-        }
-        std::cout << "\nTotal cost: " << evaluateSolution(solutions[0]) << "\n";
-        std::cout << "\nExpected cost: " << bestSolution << "\n";
+        std::cout << "Total cost: " << evaluateSolution(solutions[0]) << "\n";
+        std::cout << "Expected cost: " << bestSolution << "\n";
     }
 }
 

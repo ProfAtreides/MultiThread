@@ -4,8 +4,8 @@ project(List2)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXE_LINKER_FLAGS "-static")
 
-add_executable(Zad1 Zad1/lab1.cpp)
-add_executable(Zad2 Zad2/lab2.cpp)
+add_executable(Zad1 Zad1/jobShop.cpp)
+add_executable(Zad2 Zad2/QAP.cpp)
 add_executable(TEST test.cpp)
 
 option(ENABLE_MPI "Enable MPI parallelization" ON)
