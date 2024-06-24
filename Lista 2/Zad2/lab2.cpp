@@ -1,36 +1,50 @@
 #include <mpi.h>
 #include <iostream>
 #include <vector>
+#include <fstream>
 #include <algorithm>
 #include <climits>
 #include <cstdlib>
 #include <ctime>
+#include <direct.h>
 
-// Struktura operacji
-struct Operation {
-    int taskId;
-    int machineId;
-    int processingTime;
-};
+// Dane wejściowe (przykład)
+int n;
 
-// Przykładowe dane wejściowe (można zmodyfikować)
-std::vector<Operation> operations = {
-        {1, 1, 3},
-        {1, 2, 2},
-        {2, 1, 2},
-        {2, 2, 1},
-        {3, 1, 4},
-        {3, 2, 3}
-};
+int bestSolution;
 
-int numTasks = 3;
-int numMachines = 2;
+// Koszty na jednostkę odległości pomiędzy urządzeniami
+int costMatrix[1024][1024];
+
+// Odległości pomiędzy lokalizacjami
+int distanceMatrix[1024][1024];
+
+void loadData() {
+    std::fstream file("../Zad2/data.txt", std::ios_base::in);
+
+    if (!file.is_open()) {
+        std::cout << "Error: file not found\n";
+        exit(1);
+    }
+
+    file >> n >> bestSolution;
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            file >> costMatrix[i][j];
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            file >> distanceMatrix[i][j];
+        }
+    }
+}
 
 // Generowanie losowych początkowych rozwiązań
-std::vector<std::vector<int>> generateInitialSolutions(int numSolutions, int numOperations) {
-    std::vector<std::vector<int>> solutions(numSolutions, std::vector<int>(numOperations));
-    for (auto &solution : solutions) {
-        for (int i = 0; i < numOperations; ++i) {
+std::vector<std::vector<int>> generateInitialSolutions(int numSolutions) {
+    std::vector<std::vector<int>> solutions(numSolutions, std::vector<int>(n));
+    for (auto &solution: solutions) {
+        for (int i = 0; i < n; ++i) {
             solution[i] = i;
         }
         std::random_shuffle(solution.begin(), solution.end());
@@ -38,19 +52,15 @@ std::vector<std::vector<int>> generateInitialSolutions(int numSolutions, int num
     return solutions;
 }
 
-// Funkcja oceny rozwiązania (sumaryczny czas przetwarzania)
+// Funkcja oceny rozwiązania (sumaryczny koszt)
 int evaluateSolution(const std::vector<int> &solution) {
-    std::vector<int> machineEndTime(numMachines, 0);
-    std::vector<int> taskEndTime(numTasks, 0);
-
-    for (int opIndex : solution) {
-        const Operation &op = operations[opIndex];
-        int startTime = std::max(machineEndTime[op.machineId - 1], taskEndTime[op.taskId - 1]);
-        int endTime = startTime + op.processingTime;
-        machineEndTime[op.machineId - 1] = endTime;
-        taskEndTime[op.taskId - 1] = endTime;
+    int totalCost = 0;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            totalCost += costMatrix[i][j] * distanceMatrix[solution[i]][solution[j]];
+        }
     }
-    return *std::max_element(machineEndTime.begin(), machineEndTime.end());
+    return totalCost;
 }
 
 // Kombinacja dwóch rozwiązań
@@ -65,18 +75,20 @@ std::vector<int> combineSolutions(const std::vector<int> &sol1, const std::vecto
 // Poprawa rozwiązania (np. przez lokalne przeszukiwanie)
 std::vector<int> improveSolution(const std::vector<int> &solution) {
     std::vector<int> improvedSolution = solution;
-    // Prosta zamiana dwóch operacji
-    std::swap(improvedSolution[0], improvedSolution[1]);
+    // Prosta zamiana dwóch lokalizacji
+    if (solution.size() > 1) {
+        std::swap(improvedSolution[0], improvedSolution[1]);
+    }
+
     return improvedSolution;
 }
 
 // Główna funkcja harmonogramująca z użyciem Scatter Search
 void scatterSearch(int rank, int size) {
-    int numOperations = operations.size();
-    int numSolutions = 10;
+    int numSolutions = 50;
 
     // Generowanie początkowej populacji
-    std::vector<std::vector<int>> solutions = generateInitialSolutions(numSolutions, numOperations);
+    std::vector<std::vector<int>> solutions = generateInitialSolutions(numSolutions);
 
     // Główna pętla Scatter Search
     for (int iteration = 0; iteration < 100; ++iteration) {
@@ -101,23 +113,23 @@ void scatterSearch(int rank, int size) {
     // Proces 0: Zbiera wyniki i wyświetla harmonogram
     if (rank == 0) {
         std::cout << "Best solution:\n";
-        for (const auto &opIndex : solutions[0]) {
-            const Operation &op = operations[opIndex];
-            std::cout << "Task " << op.taskId << " on Machine " << op.machineId
-                      << " with Processing Time " << op.processingTime << "\n";
+        for (int loc: solutions[0]) {
+            std::cout << loc << " ";
         }
-        std::cout << "Total processing time: " << evaluateSolution(solutions[0]) << "\n";
+        std::cout << "\nTotal cost: " << evaluateSolution(solutions[0]) << "\n";
+        std::cout << "\nExpected cost: " << bestSolution << "\n";
     }
 }
 
 int main(int argc, char *argv[]) {
-    MPI_Init(&argc, &argv);
 
+    MPI_Init(&argc, &argv);
+    loadData();
     int rank, size;
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    // Harmonogramowanie operacji
     scatterSearch(rank, size);
 
     MPI_Finalize();
